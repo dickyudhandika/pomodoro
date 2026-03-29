@@ -1,0 +1,15 @@
+# Build artifacts
+Pomodoro
+Pomodoro.app/
+.build/
+
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+DerivedData/
+
+# macOS
+.DS_Store
+
+# Claude
+.claude/
