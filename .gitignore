@@ -1,6 +1,6 @@
 # Build artifacts
-Pomodoro
-Pomodoro.app/
+/Pomodoro
+/Pomodoro.app/
 .build/
 
 # Xcode

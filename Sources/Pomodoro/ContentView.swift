@@ -67,7 +67,7 @@ extension Phase {
 // MARK: - Content View
 
 struct ContentView: View {
-    @StateObject private var model = TimerModel()
+    @ObservedObject var model: TimerModel
     @State private var showAnalytics = false
     @Environment(\.colorScheme) var scheme
 
