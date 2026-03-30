@@ -4,9 +4,12 @@
 .build/
 
 # Xcode
-*.xcodeproj/
 *.xcworkspace/
 DerivedData/
+.swiftpm/
+
+# Build output
+build/
 
 # macOS
 .DS_Store
