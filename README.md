@@ -13,4 +13,5 @@
 
 ## Build distributable bundle
 1. `swift build -c release`
-2. `ditto -c -k .build/app/Pomodoro.app Pomodoro-macOS-v0.1.0.zip`
+2. `./scripts/make_dmg.sh` (creates `Pomodoro-macOS-v0.1.0.dmg` with drag-to-Applications shortcut)
+3. Optional zip: `ditto -c -k .build/app/Pomodoro.app Pomodoro-macOS-v0.1.0.zip`
