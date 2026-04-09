@@ -208,8 +208,7 @@ struct ContentView: View {
                             .stroke(t.border, lineWidth: 1)
                     )
             )
-            .disabled(model.isRunning)
-            .opacity(model.isRunning && model.taskName.isEmpty ? 0 : 1)
+            .disabled(model.hasActiveTask)
             .tint(model.phase.accent)
     }
 
@@ -217,14 +216,24 @@ struct ContentView: View {
 
     var controls: some View {
         HStack(spacing: 8) {
-            // Reset — ghost icon button (h-10 w-10 = 40x40, rounded-md, outline)
-            Button(action: { model.reset() }) {
-                Image(systemName: "arrow.counterclockwise")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(t.mutedFg)
-                    .frame(width: 40, height: 40)
+            // Stop (when active task) or Reset
+            if model.hasActiveTask {
+                Button(action: { model.stopTask() }) {
+                    Image(systemName: "stop.fill")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(model.phase.accent)
+                        .frame(width: 40, height: 40)
+                }
+                .buttonStyle(OutlineIconButtonStyle(theme: t))
+            } else {
+                Button(action: { model.reset() }) {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(t.mutedFg)
+                        .frame(width: 40, height: 40)
+                }
+                .buttonStyle(OutlineIconButtonStyle(theme: t))
             }
-            .buttonStyle(OutlineIconButtonStyle(theme: t))
 
             // Play / Pause — primary button (h-11 = 44px, rounded-md, bg-primary)
             Button(action: { model.toggle() }) {

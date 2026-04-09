@@ -2,8 +2,8 @@ import SwiftUI
 
 struct MenuBarView: View {
     @ObservedObject var model: TimerModel
+    var openMainWindow: () -> Void = {}
     @Environment(\.colorScheme) var scheme
-    @Environment(\.openWindow) var openWindow
 
     var t: ShadTheme { scheme == .dark ? .dark : .light }
 
@@ -68,8 +68,7 @@ struct MenuBarView: View {
 
                     // Open main window — outline icon button
                     Button(action: {
-                        openWindow(id: "main")
-                        NSApplication.shared.activate(ignoringOtherApps: true)
+                        openMainWindow()
                     }) {
                         Image(systemName: "arrow.up.backward.and.arrow.down.forward")
                             .font(.system(size: 11, weight: .medium))
@@ -86,6 +85,27 @@ struct MenuBarView: View {
                     }
                     .buttonStyle(.plain)
                 }
+
+                // Separator
+                Rectangle()
+                    .fill(t.border)
+                    .frame(height: 1)
+
+                // Sound toggle
+                Toggle(isOn: $model.soundEnabled) {
+                    HStack(spacing: 6) {
+                        Image(systemName: model.soundEnabled ? "speaker.wave.2" : "speaker.slash")
+                            .font(.system(size: 11))
+                            .foregroundStyle(t.mutedFg)
+                            .frame(width: 14)
+                        Text("Sound")
+                            .font(.system(size: 12))
+                            .foregroundStyle(t.foreground)
+                    }
+                }
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .tint(model.phase.accent)
                 .padding(.bottom, 16)
             }
             .padding(.horizontal, 16)

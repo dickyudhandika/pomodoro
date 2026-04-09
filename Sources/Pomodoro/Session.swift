@@ -6,10 +6,12 @@ struct Session: Identifiable, Codable {
     let phaseRaw: String
     let taskName: String
     let wasSkipped: Bool
+    let elapsedSeconds: TimeInterval?  // nil = use phase default; populated for partial and tracked sessions
 
     var phase: Phase? { Phase(rawValue: phaseRaw) }
 
     var durationMinutes: Int {
+        if let e = elapsedSeconds { return max(1, Int(e / 60)) }
         switch phaseRaw {
         case Phase.work.rawValue:       return 25
         case Phase.shortBreak.rawValue: return 5
