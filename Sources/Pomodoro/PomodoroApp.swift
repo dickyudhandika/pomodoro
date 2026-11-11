@@ -56,8 +56,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         popover.contentViewController = host
     }
 
+    /// Longest task name shown in the menu bar before it is cut off with "…".
+    private let menuBarNameLimit = 24
+
     private func updateButton() {
         guard let button = statusItem.button else { return }
+
+        // Task name on the left whenever a focus task is selected; nothing when there is no task.
+        let title = NSMutableAttributedString()
+        if model.phase == .work, !model.taskName.isEmpty {
+            var name = model.taskName
+            if name.count > menuBarNameLimit {
+                name = String(name.prefix(menuBarNameLimit - 1)).trimmingCharacters(in: .whitespaces) + "…"
+            }
+            title.append(NSAttributedString(string: name + "  ", attributes: [
+                .font: NSFont.systemFont(ofSize: 13)
+            ]))
+        }
 
         if model.inSession {
             // Dot + time whenever a phase is in progress; dimmed while paused.
@@ -72,20 +87,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
             if !model.isRunning {
                 timeAttrs[.foregroundColor] = NSColor.secondaryLabelColor
             }
-            let s = NSMutableAttributedString(string: "● ", attributes: dotAttrs)
-            s.append(NSAttributedString(string: model.timeString, attributes: timeAttrs))
-            button.attributedTitle = s
+            title.append(NSAttributedString(string: "● ", attributes: dotAttrs))
+            title.append(NSAttributedString(string: model.timeString, attributes: timeAttrs))
+            button.attributedTitle = title
             button.image = nil
         } else if model.breakEnded {
             let attrs: [NSAttributedString.Key: Any] = [
                 .foregroundColor: NSColor.orange,
                 .font: NSFont.systemFont(ofSize: 11, weight: .medium)
             ]
-            button.attributedTitle = NSAttributedString(string: "● ▶", attributes: attrs)
+            title.append(NSAttributedString(string: "● ▶", attributes: attrs))
+            button.attributedTitle = title
             button.image = nil
         } else {
-            button.attributedTitle = NSAttributedString()
+            // Idle: timer icon, with the selected task name to its left (if any).
+            button.attributedTitle = title
             button.image = NSImage(systemSymbolName: "timer", accessibilityDescription: nil)
+            button.imagePosition = title.length == 0 ? .imageOnly : .imageRight
         }
     }
 

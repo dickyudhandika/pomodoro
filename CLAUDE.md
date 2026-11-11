@@ -98,7 +98,8 @@ Work (25m) → Long Break (15m)  [after every 4th pomodoro]
 ### Menu Bar
 - `LSUIElement = true` in Info.plist — no dock icon
 - App is menu-bar-only: the SwiftUI scene is `Settings { EmptyView() }`
-- Colored dot + "MM:SS" in status bar whenever a phase is in progress (dimmed when paused); ▶ indicator when break ends; timer icon when idle
+- Selected task name (focus phase only, cut to 24 chars) on the left of the status item; nothing when no task is selected
+- Then: colored dot + "MM:SS" whenever a phase is in progress (dimmed when paused); ▶ indicator when break ends; timer icon when idle
 - Popover is transient (closes on outside click)
 
 ### Notifications
