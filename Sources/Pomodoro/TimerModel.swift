@@ -27,13 +27,7 @@ enum Phase: String, CaseIterable {
         }
     }
 
-    var color: String {
-        switch self {
-        case .work:       return "PomodoroRed"
-        case .shortBreak: return "PomodoroGreen"
-        case .longBreak:  return "PomodoroBlue"
-        }
-    }
+    var isBreak: Bool { self != .work }
 }
 
 class TimerModel: ObservableObject {
@@ -48,156 +42,171 @@ class TimerModel: ObservableObject {
     let store = SessionStore()
 
     private var timer: AnyCancellable?
+    /// When the current run (since the last start/resume) began.
     private var startDate: Date?
-    private var sessionTaskName: String = ""
-    private var elapsedBeforePause: TimeInterval = 0
-    private var startedWithRemaining: TimeInterval = 0
-
-    var progress: Double {
-        1.0 - (timeRemaining / phase.duration)
-    }
+    /// Time remaining at `startDate`. The countdown is always `remainingAtStart - (now - startDate)`.
+    private var remainingAtStart: TimeInterval = Phase.work.duration
+    /// Time remaining when the current task segment began. Segment elapsed = this - remaining now.
+    /// Switching tasks only moves this marker; it never touches `startDate` or the countdown.
+    private var segmentStartRemaining: TimeInterval = Phase.work.duration
 
     var timeString: String {
-        let minutes = Int(timeRemaining) / 60
-        let seconds = Int(timeRemaining) % 60
-        return String(format: "%02d:%02d", minutes, seconds)
+        let total = Int(timeRemaining.rounded(.up))
+        return String(format: "%02d:%02d", total / 60, total % 60)
     }
 
-    /// True when a work task is actively being tracked (session started or running with a task name)
-    var hasActiveTask: Bool {
-        phase == .work && ((isRunning && !taskName.isEmpty) || !sessionTaskName.isEmpty)
+    /// True when the current phase has been started (running or paused part-way through).
+    var inSession: Bool {
+        isRunning || timeRemaining < phase.duration
     }
+
+    /// Precise remaining time right now (timeRemaining is only refreshed every 0.5s).
+    private var currentRemaining: TimeInterval {
+        guard isRunning, let start = startDate else { return timeRemaining }
+        return max(0, remainingAtStart - Date().timeIntervalSince(start))
+    }
+
+    // MARK: - Controls
 
     func toggle() {
         isRunning ? pause() : start()
     }
 
     func start() {
+        guard !isRunning else { return }
         breakEnded = false
-
-        // Detect task name change during a pause (work phase only)
-        if phase == .work && !sessionTaskName.isEmpty && sessionTaskName != taskName {
-            if elapsedBeforePause >= 60 {
-                store.add(Session(
-                    id: UUID(), completedAt: Date(), phaseRaw: phase.rawValue,
-                    taskName: sessionTaskName, wasSkipped: false, elapsedSeconds: elapsedBeforePause
-                ))
-            }
-            elapsedBeforePause = 0
-        }
-        if phase == .work { sessionTaskName = taskName }
-
-        startedWithRemaining = timeRemaining
-        isRunning = true
-        let remaining = timeRemaining
+        remainingAtStart = timeRemaining
         startDate = Date()
+        isRunning = true
         timer = Timer.publish(every: 0.5, on: .main, in: .common)
             .autoconnect()
-            .sink { [weak self] _ in
-                guard let self, let start = self.startDate else { return }
-                let elapsed = Date().timeIntervalSince(start)
-                let newRemaining = remaining - elapsed
-                if newRemaining <= 0 {
-                    self.complete()
-                } else {
-                    self.timeRemaining = newRemaining
-                }
-            }
+            .sink { [weak self] _ in self?.tick() }
+    }
+
+    private func tick() {
+        guard isRunning, let start = startDate else { return }
+        let newRemaining = remainingAtStart - Date().timeIntervalSince(start)
+        if newRemaining <= 0 {
+            timeRemaining = 0
+            complete()
+        } else {
+            timeRemaining = newRemaining
+        }
     }
 
     func pause() {
+        guard isRunning else { return }
+        timeRemaining = currentRemaining
         isRunning = false
         timer?.cancel()
         timer = nil
         startDate = nil
-        elapsedBeforePause += max(0, startedWithRemaining - timeRemaining)
     }
 
     func reset() {
         pause()
         timeRemaining = phase.duration
-        sessionTaskName = ""; elapsedBeforePause = 0; startedWithRemaining = 0
+        remainingAtStart = phase.duration
+        segmentStartRemaining = phase.duration
     }
 
+    /// Ends the current phase early and moves on (used for "Skip break").
     func skip() {
         complete(skipped: true)
     }
 
-    /// Log the current task to analytics and clear it, but keep the pomodoro timer running.
-    func stopTask() {
-        guard phase == .work else { return }
-        let currentSegment: TimeInterval = isRunning ? max(0, startedWithRemaining - timeRemaining) : 0
-        let totalElapsed = elapsedBeforePause + currentSegment
-        let name = sessionTaskName.isEmpty ? taskName : sessionTaskName
-        if !name.isEmpty && totalElapsed >= 5 {
-            store.add(Session(
-                id: UUID(), completedAt: Date(), phaseRaw: phase.rawValue,
-                taskName: name, wasSkipped: false, elapsedSeconds: totalElapsed
-            ))
+    /// Switch the task being tracked. During a focus session the time spent so far is logged
+    /// to the previous task and the countdown carries on, uninterrupted, for the new one.
+    func selectTask(name: String) {
+        if phase == .work {
+            logSegment()
+            segmentStartRemaining = currentRemaining
         }
-        sessionTaskName = ""
-        taskName = ""
-        elapsedBeforePause = 0
-        if isRunning {
-            // Reset elapsed tracking so the next task's time is measured from now
-            startedWithRemaining = timeRemaining
-            startDate = Date()
-        }
+        taskName = name
+    }
+
+    /// Log the current focus segment, then reset the focus timer.
+    func stop() {
+        if phase == .work { logSegment() }
+        reset()
+    }
+
+    // MARK: - Recording
+
+    /// Logs the time spent on the current task since the segment began (≥5s), as a partial focus session.
+    private func logSegment() {
+        let elapsed = segmentStartRemaining - currentRemaining
+        guard elapsed >= 5 else { return }
+        store.add(Session(
+            id: UUID(), completedAt: Date(), phaseRaw: Phase.work.rawValue,
+            taskName: taskName, wasSkipped: false, elapsedSeconds: elapsed,
+            countsAsPomodoro: false
+        ))
     }
 
     private func complete(skipped: Bool = false) {
-        pause()  // accumulates final segment into elapsedBeforePause
-        let name = (phase == .work && !sessionTaskName.isEmpty) ? sessionTaskName : taskName
-        let elapsed: TimeInterval? = elapsedBeforePause > 0 ? elapsedBeforePause : nil
+        pause()
+        let completed = phase
+        let name = taskName
+        let elapsed = segmentStartRemaining - timeRemaining
+        let isFullFocus = completed == .work && !skipped
+
         store.add(Session(
             id: UUID(),
             completedAt: Date(),
-            phaseRaw: phase.rawValue,
-            taskName: name,
+            phaseRaw: completed.rawValue,
+            taskName: completed == .work ? name : "",
             wasSkipped: skipped,
-            elapsedSeconds: elapsed
+            elapsedSeconds: elapsed > 0 ? elapsed : nil,
+            countsAsPomodoro: completed == .work ? isFullFocus : nil
         ))
-        sessionTaskName = ""; elapsedBeforePause = 0; startedWithRemaining = 0
-        if phase == .work && !skipped {
+
+        if isFullFocus {
             completedPomodoros += 1
         }
-        if (phase == .shortBreak || phase == .longBreak) && !skipped {
+        if completed.isBreak && !skipped {
             breakEnded = true
         }
-        sendNotification(for: phase)
-        if soundEnabled {
-            if let sound = NSSound(named: .init("Funk")) {
-                sound.volume = 1.0
-                sound.play()
-            }
+        if !skipped {
+            sendNotification(for: completed, taskName: name)
+            playSound()
         }
+
         advance()
+
+        // Breaks start on their own; focus waits for the user.
+        if phase.isBreak {
+            start()
+        }
     }
 
     private func advance() {
         switch phase {
         case .work:
-            phase = (completedPomodoros % 4 == 0) ? .longBreak : .shortBreak
+            phase = (completedPomodoros > 0 && completedPomodoros % 4 == 0) ? .longBreak : .shortBreak
         case .shortBreak, .longBreak:
             phase = .work
         }
         timeRemaining = phase.duration
+        remainingAtStart = phase.duration
+        segmentStartRemaining = phase.duration
     }
 
-    func select(phase: Phase) {
-        pause()
-        self.phase = phase
-        timeRemaining = phase.duration
-        sessionTaskName = ""; elapsedBeforePause = 0; startedWithRemaining = 0
+    private func playSound() {
+        guard soundEnabled, let sound = NSSound(named: .init("Funk")) else { return }
+        sound.volume = 1.0
+        sound.play()
     }
 
-    private func sendNotification(for completedPhase: Phase) {
+    private func sendNotification(for completedPhase: Phase, taskName: String) {
+        // UNUserNotificationCenter is only available inside an .app bundle.
+        guard Bundle.main.bundleURL.pathExtension == "app" else { return }
         let content = UNMutableNotificationContent()
         content.sound = .default
         switch completedPhase {
         case .work:
             content.title = taskName.isEmpty ? "Pomodoro complete!" : "\u{201C}\(taskName)\u{201D} done!"
-            content.body = (completedPomodoros % 4 == 0) ? "Time for a long break." : "Time for a short break."
+            content.body = (completedPomodoros % 4 == 0) ? "Long break started." : "Short break started."
         case .shortBreak:
             content.title = "Break over! Time to focus."
             content.body = "Ready to focus?"

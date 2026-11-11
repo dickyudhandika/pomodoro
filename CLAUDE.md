@@ -1,7 +1,7 @@
 # Pomodoro macOS App
 
 ## Project Overview
-macOS menu bar Pomodoro timer. The menu bar is the primary UI; the main window is secondary/optional. No external dependencies — pure Swift, SwiftUI, and system frameworks.
+macOS menu-bar-only Pomodoro timer. The whole UI is a slim, task-first popover (task title + round start/pause button, with a task dropdown). The only window is Analytics. No external dependencies — pure Swift, SwiftUI, and system frameworks.
 
 - **Platform:** macOS 13+ (Ventura)
 - **Language:** Swift 5.8+
@@ -22,23 +22,28 @@ Or open `Pomodoro.xcodeproj` in Xcode and run from there.
 ```
 TimerModel (ObservableObject)
   - Core timer state and mechanics
-  - Phase cycling, session completion
+  - Phase cycling, session completion, task-segment logging
   - Dispatches notifications
 
 SessionStore (ObservableObject)
   - Stores completed sessions in UserDefaults (key: "pomodoro.sessions")
   - Analytics helpers: todaySessions, todayFocusMinutes, etc.
 
+TaskStore (ObservableObject)
+  - Two-level task list (tasks + subtasks) and current selection
+  - UserDefaults keys: "pomodoro.tasks", "pomodoro.selectedTask"
+
 AppDelegate (NSApplicationDelegate)
+  - Owns TimerModel + TaskStore
   - NSStatusItem + attributed string button in menu bar
-  - NSPopover (transient) hosting MenuBarView
+  - NSPopover (transient, animates = false) hosting MenuBarView
+  - Lazily created NSWindow hosting AnalyticsView
   - UNUserNotificationCenter setup and delegate
   - Combine subscribers to react to model changes
 
 Views (SwiftUI)
-  - ContentView     — main window (360×500), timer ring, phase tabs, task input
-  - MenuBarView     — popover (240px wide), compact controls
-  - AnalyticsView   — modal sheet, session history by day
+  - MenuBarView     — popover (280px wide): slim row + task dropdown + footer
+  - AnalyticsView   — session history by day (own window, onClose closure)
 ```
 
 ## Key Files
@@ -47,44 +52,53 @@ Views (SwiftUI)
 |------|---------|
 | `Sources/Pomodoro/TimerModel.swift` | Timer state, phase logic, session recording |
 | `Sources/Pomodoro/Session.swift` | Session model + UserDefaults persistence + analytics |
-| `Sources/Pomodoro/PomodoroApp.swift` | App entry point, AppDelegate, menu bar setup |
-| `Sources/Pomodoro/ContentView.swift` | Main window UI, `ShadTheme` design tokens |
-| `Sources/Pomodoro/MenuBarView.swift` | Menu bar popover UI |
-| `Sources/Pomodoro/AnalyticsView.swift` | Session history and daily stats sheet |
+| `Sources/Pomodoro/Tasks.swift` | `TaskItem` + `TaskStore` (tasks, subtasks, selection, persistence) |
+| `Sources/Pomodoro/PomodoroApp.swift` | App entry point, AppDelegate, menu bar, popover, analytics window |
+| `Sources/Pomodoro/Theme.swift` | `ShadTheme` design tokens, `Color(hex:)`, `Phase.accent` |
+| `Sources/Pomodoro/MenuBarView.swift` | Menu bar popover UI (task row, dropdown, footer) |
+| `Sources/Pomodoro/AnalyticsView.swift` | Session history and daily stats (analytics window) |
 
 ## Key Patterns
 
 ### Timer Mechanics
 - `Timer.publish(every: 0.5, on: .main, in: .common)` + Combine sink
 - Elapsed time tracked via system `Date()` (drift-resistant, not frame count)
-- `startDate` + `elapsedBeforePause` handle pause/resume without losing time
+- Countdown = `remainingAtStart - (now - startDate)`; both are stored properties, reset on each start/resume
+- Task segments are measured with a separate marker, `segmentStartRemaining` (segment = marker − remaining now), so switching tasks never touches `startDate` or the countdown
 
 ### Phase Cycling
 ```
 Work (25m) → Short Break (5m)  [after pomodoros 1, 2, 3]
 Work (25m) → Long Break (15m)  [after every 4th pomodoro]
 ```
+- Breaks start automatically when a focus phase completes; focus never auto-starts after a break (orange ▶ indicator, popover pops up, "Start Session" notification).
+- No manual phase switching.
 
-### Task Tracking & Stop Button
-- **Stop task** (`TimerModel.stopTask()`): logs the current task to analytics with elapsed time, clears the task name, resets elapsed tracking — but the pomodoro timer keeps running uninterrupted. This lets users switch tasks mid-pomodoro without resetting the countdown.
-- `hasActiveTask: Bool` — `true` when in work phase and either running with a task name or a session task name is locked in. Drives the Stop vs Reset button swap in `ContentView.controls`.
-- Task input is disabled when `hasActiveTask` is true; editable otherwise (including while timer runs after a stop, so user can type the next task).
-- Left control button: **stop.fill** (phase-colored) when `hasActiveTask`, **arrow.counterclockwise** (reset) otherwise.
-- Auto-save on task rename: if the user renames the task during a paused work session and ≥60s have elapsed, the original task is auto-saved as a separate session (handled in `start()`).
+### Tasks & Popover Flow
+- Popover = one slim row: task title (or "Select a task"; "Short Break"/"Long Break" during breaks) + round phase-coloured play/pause button (`model.toggle()`).
+- Tapping the row body toggles the dropdown (`@State expanded`): tasks, indented subtasks, `+` (add subtask) and `×` (remove) on hover, "Add task…" field at the bottom. Footer: **Stop** (focus in progress) or **Skip break** (break), plus analytics, sound and quit icons.
+- No animation anywhere: no `withAnimation`, `.animation` or transitions; popover `animates = false`; hosting controller `sizingOptions = .preferredContentSize` for instant resize.
+- **Pick a task** → `TaskStore.select(id:)` + `TimerModel.selectTask(name:)`: during focus, logs the segment so far (≥5s) to the previous task and keeps the countdown running for the new one.
+- Recorded task name (`TaskStore.selectedName`): `"Title"` or `"Parent › Sub"`. Empty name shows as "—" in analytics.
+- Removing a parent removes its subtasks; removing the selected task clears the selection (segment logged to it).
+- **Stop** (`TimerModel.stop()`): logs the current segment, then `reset()` to 25:00.
+- `Session.countsAsPomodoro`: `true` only for a fully completed focus phase; task-switch and Stop segments are `false`; old records are `nil` (counted as before). `todayPomodoros` uses it.
 
 ### Persistence
 - Sessions: `UserDefaults` key `"pomodoro.sessions"`, JSON-encoded via `Codable`
+- Tasks: `UserDefaults` keys `"pomodoro.tasks"` (JSON `[TaskItem]`) and `"pomodoro.selectedTask"` (UUID string)
 - Settings: `@AppStorage("soundEnabled")` for sound toggle
 
 ### UI Design System
-- `ShadTheme` struct in `ContentView.swift` — shadcn-inspired design tokens
+- `ShadTheme` struct in `Theme.swift` — shadcn-inspired design tokens
 - Hex-based `Color` initializer
 - Phase accent colors: Red `#E84C3D` (work), Green `#40B87C` (short break), Blue `#4080EB` (long break)
 - Dark/light themes defined in `ShadTheme`, toggled via `@Environment(\.colorScheme)`
 
 ### Menu Bar
 - `LSUIElement = true` in Info.plist — no dock icon
-- Colored dot + "MM:SS" in status bar; ▶ indicator when break ends
+- App is menu-bar-only: the SwiftUI scene is `Settings { EmptyView() }`
+- Colored dot + "MM:SS" in status bar whenever a phase is in progress (dimmed when paused); ▶ indicator when break ends; timer icon when idle
 - Popover is transient (closes on outside click)
 
 ### Notifications

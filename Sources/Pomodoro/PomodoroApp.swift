@@ -7,16 +7,9 @@ import Combine
 struct PomodoroApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
+    // Menu-bar-only app: no main window. The UI lives in the status item popover.
     var body: some Scene {
-        WindowGroup(id: "main") {
-            ContentView(model: appDelegate.model)
-                .frame(minWidth: 360, minHeight: 500)
-        }
-        .windowStyle(.hiddenTitleBar)
-        .windowResizability(.contentSize)
-        .commands {
-            CommandGroup(replacing: .newItem) {}
-        }
+        Settings { EmptyView() }
     }
 }
 
@@ -24,33 +17,20 @@ struct PomodoroApp: App {
 
 class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     let model = TimerModel()
+    let tasks = TaskStore()
 
     private var statusItem: NSStatusItem!
     private var popover: NSPopover!
+    private var analyticsWindow: NSWindow?
     private var cancellables = Set<AnyCancellable>()
-    private var mainWindow: NSWindow?
 
     // MARK: Launch
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        model.taskName = tasks.selectedName
         setupMenuBar()
         observeModel()
         setupNotifications()
-
-        // Capture main window reference once it becomes key
-        NotificationCenter.default.addObserver(
-            forName: NSWindow.didBecomeMainNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] note in
-            if let win = note.object as? NSWindow, win.canBecomeMain {
-                self?.mainWindow = win
-            }
-        }
-
-        DispatchQueue.main.async {
-            NSApplication.shared.windows.first?.center()
-        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
@@ -63,24 +43,35 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         statusItem.button?.target = self
         updateButton()
 
+        let host = NSHostingController(
+            rootView: MenuBarView(model: model, tasks: tasks,
+                                  openAnalytics: { [weak self] in self?.openAnalytics() })
+        )
+        // Popover follows the SwiftUI content size, so opening the dropdown resizes it immediately.
+        host.sizingOptions = .preferredContentSize
+
         popover = NSPopover()
         popover.behavior = .transient
-        popover.contentViewController = NSHostingController(
-            rootView: MenuBarView(model: model, openMainWindow: { [weak self] in self?.openMainWindow() })
-        )
+        popover.animates = false
+        popover.contentViewController = host
     }
 
     private func updateButton() {
         guard let button = statusItem.button else { return }
 
-        if model.isRunning {
+        if model.inSession {
+            // Dot + time whenever a phase is in progress; dimmed while paused.
+            let alpha: CGFloat = model.isRunning ? 1 : 0.4
             let dotAttrs: [NSAttributedString.Key: Any] = [
-                .foregroundColor: model.phase.accentNSColor,
+                .foregroundColor: model.phase.accentNSColor.withAlphaComponent(alpha),
                 .font: NSFont.systemFont(ofSize: 8, weight: .medium)
             ]
-            let timeAttrs: [NSAttributedString.Key: Any] = [
+            var timeAttrs: [NSAttributedString.Key: Any] = [
                 .font: NSFont.monospacedSystemFont(ofSize: 11, weight: .medium)
             ]
+            if !model.isRunning {
+                timeAttrs[.foregroundColor] = NSColor.secondaryLabelColor
+            }
             let s = NSMutableAttributedString(string: "● ", attributes: dotAttrs)
             s.append(NSAttributedString(string: model.timeString, attributes: timeAttrs))
             button.attributedTitle = s
@@ -108,8 +99,32 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         popover.isShown ? popover.performClose(nil) : showPopover()
     }
 
-    private func openMainWindow() {
-        mainWindow?.makeKeyAndOrderFront(nil)
+    // MARK: Analytics window
+
+    private func openAnalytics() {
+        popover.performClose(nil)
+        if analyticsWindow == nil {
+            let view = AnalyticsView(store: model.store,
+                                     onClose: { [weak self] in self?.analyticsWindow?.close() })
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 420, height: 540),
+                styleMask: [.titled, .closable, .fullSizeContentView],
+                backing: .buffered,
+                defer: false
+            )
+            window.title = "Analytics"
+            window.titleVisibility = .hidden
+            window.titlebarAppearsTransparent = true
+            window.isMovableByWindowBackground = true
+            window.standardWindowButton(.closeButton)?.isHidden = true
+            window.standardWindowButton(.miniaturizeButton)?.isHidden = true
+            window.standardWindowButton(.zoomButton)?.isHidden = true
+            window.isReleasedWhenClosed = false
+            window.contentViewController = NSHostingController(rootView: view)
+            window.center()
+            analyticsWindow = window
+        }
+        analyticsWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 

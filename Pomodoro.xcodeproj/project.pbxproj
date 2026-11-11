@@ -8,21 +8,23 @@
 
 /* Begin PBXBuildFile section */
 		AA000000000000000000001 /* PomodoroApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000011 /* PomodoroApp.swift */; };
-		AA000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000012 /* ContentView.swift */; };
+		AA000000000000000000002 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000012 /* Theme.swift */; };
 		AA000000000000000000003 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000013 /* MenuBarView.swift */; };
 		AA000000000000000000004 /* TimerModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000014 /* TimerModel.swift */; };
 		AA000000000000000000005 /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000015 /* Session.swift */; };
 		AA000000000000000000006 /* AnalyticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000016 /* AnalyticsView.swift */; };
+		AA000000000000000000007 /* Tasks.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000018 /* Tasks.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		AA000000000000000000010 /* Pomodoro.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Pomodoro.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA000000000000000000011 /* PomodoroApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PomodoroApp.swift; sourceTree = "<group>"; };
-		AA000000000000000000012 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		AA000000000000000000012 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		AA000000000000000000013 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		AA000000000000000000014 /* TimerModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerModel.swift; sourceTree = "<group>"; };
 		AA000000000000000000015 /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
 		AA000000000000000000016 /* AnalyticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsView.swift; sourceTree = "<group>"; };
+		AA000000000000000000018 /* Tasks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tasks.swift; sourceTree = "<group>"; };
 		AA000000000000000000017 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -39,11 +41,12 @@
 			isa = PBXGroup;
 			children = (
 				AA000000000000000000011 /* PomodoroApp.swift */,
-				AA000000000000000000012 /* ContentView.swift */,
+				AA000000000000000000012 /* Theme.swift */,
 				AA000000000000000000013 /* MenuBarView.swift */,
 				AA000000000000000000014 /* TimerModel.swift */,
 				AA000000000000000000015 /* Session.swift */,
 				AA000000000000000000016 /* AnalyticsView.swift */,
+				AA000000000000000000018 /* Tasks.swift */,
 				AA000000000000000000017 /* Info.plist */,
 			);
 			path = "Sources/Pomodoro";
@@ -125,11 +128,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA000000000000000000001 /* PomodoroApp.swift in Sources */,
-				AA000000000000000000002 /* ContentView.swift in Sources */,
+				AA000000000000000000002 /* Theme.swift in Sources */,
 				AA000000000000000000003 /* MenuBarView.swift in Sources */,
 				AA000000000000000000004 /* TimerModel.swift in Sources */,
 				AA000000000000000000005 /* Session.swift in Sources */,
 				AA000000000000000000006 /* AnalyticsView.swift in Sources */,
+				AA000000000000000000007 /* Tasks.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

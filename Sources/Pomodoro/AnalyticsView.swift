@@ -2,7 +2,7 @@ import SwiftUI
 
 struct AnalyticsView: View {
     @ObservedObject var store: SessionStore
-    @Environment(\.dismiss) var dismiss
+    var onClose: () -> Void = {}
     @Environment(\.colorScheme) var scheme
 
     var t: ShadTheme { scheme == .dark ? .dark : .light }
@@ -54,7 +54,7 @@ struct AnalyticsView: View {
             }
 
             // Close — ghost icon button, rounded full (circle)
-            Button(action: { dismiss() }) {
+            Button(action: onClose) {
                 Image(systemName: "xmark")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(t.mutedFg)

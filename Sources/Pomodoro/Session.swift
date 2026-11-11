@@ -7,6 +7,9 @@ struct Session: Identifiable, Codable {
     let taskName: String
     let wasSkipped: Bool
     let elapsedSeconds: TimeInterval?  // nil = use phase default; populated for partial and tracked sessions
+    /// true only for a fully completed focus phase; false for task-switch / Stop segments.
+    /// nil on records saved before this field existed (counted as before: any unskipped focus session).
+    var countsAsPomodoro: Bool? = nil
 
     var phase: Phase? { Phase(rawValue: phaseRaw) }
 
@@ -51,7 +54,9 @@ class SessionStore: ObservableObject {
     }
 
     var todayPomodoros: Int {
-        todaySessions.filter { $0.phaseRaw == Phase.work.rawValue && !$0.wasSkipped }.count
+        todaySessions.filter {
+            $0.phaseRaw == Phase.work.rawValue && !$0.wasSkipped && ($0.countsAsPomodoro ?? true)
+        }.count
     }
 
     var uniqueTasksToday: [String] {
