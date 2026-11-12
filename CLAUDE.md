@@ -76,9 +76,10 @@ Work (25m) → Long Break (15m)  [after every 4th pomodoro]
 
 ### Tasks & Popover Flow
 - Popover = one slim row: task title (or "Select a task"; "Short Break"/"Long Break" during breaks) + round phase-coloured play/pause button (`model.toggle()`).
-- Tapping the row body toggles the dropdown (`@State expanded`): tasks, indented subtasks, `+` (add subtask) and `×` (remove) on hover, "Add task…" field at the bottom. Footer: **Stop** (focus in progress) or **Skip break** (break), plus analytics, sound and quit icons.
+- The dropdown (`@State expanded`) is **open by default** and re-opens every time the popover is shown (`NSPopover.willShowNotification`); tapping the row body collapses/expands it. With no tasks yet, the cursor goes straight into "Add task…". Contents: tasks, indented subtasks, `+` (add subtask) and `×` (remove) on hover, "Add task…" field at the bottom. Footer: **Stop** (focus in progress) or **Skip break** (break), plus analytics, sound and quit icons.
 - No animation anywhere: no `withAnimation`, `.animation` or transitions; popover `animates = false`; hosting controller `sizingOptions = .preferredContentSize` for instant resize.
-- **Pick a task** → `TaskStore.select(id:)` + `TimerModel.selectTask(name:)`: during focus, logs the segment so far (≥5s) to the previous task and keeps the countdown running for the new one.
+- **Pick a task** (list stays open) → `TaskStore.select(id:)` + `TimerModel.selectTask(name:)`: during focus, logs the segment so far (≥5s) to the previous task and keeps the countdown running for the new one.
+- **Add a task** → it is auto-selected, unless a focus session is already in progress (then it is just added to the list).
 - Recorded task name (`TaskStore.selectedName`): `"Title"` or `"Parent › Sub"`. Empty name shows as "—" in analytics.
 - Removing a parent removes its subtasks; removing the selected task clears the selection (segment logged to it).
 - **Stop** (`TimerModel.stop()`): logs the current segment, then `reset()` to 25:00.

@@ -18,11 +18,15 @@ class TaskStore: ObservableObject {
 
     // MARK: - Editing
 
-    func addTask(_ title: String) {
+    /// Adds a top-level task and returns its id (nil if the title is blank).
+    @discardableResult
+    func addTask(_ title: String) -> UUID? {
         let t = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty else { return }
-        tasks.append(TaskItem(title: t))
+        guard !t.isEmpty else { return nil }
+        let item = TaskItem(title: t)
+        tasks.append(item)
         save()
+        return item.id
     }
 
     func addSubtask(_ title: String, to parentID: UUID) {

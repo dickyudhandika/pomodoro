@@ -21,8 +21,8 @@ A native macOS menu bar Pomodoro timer built around your task list: pick a task,
 
 ## How it works (user flow)
 
-1. Click the menu bar icon. The popover is one slim row: the current task and a round play button.
-2. Tap the task title to open the task list, then tap a task (or subtask) to select it.
+1. Click the menu bar icon. The popover opens with your task list already showing, under a slim row with the current task and a round play button.
+2. Tap a task (or subtask) to select it, or type a new one in "Add task…" and press Return (it gets selected for you).
 3. Tap the round button to start. The countdown runs in the menu bar.
 4. When focus ends, the break starts on its own.
 5. When the break ends, the menu bar shows an orange ▶ and the popover opens; tap play (or "Start Session" on the notification) to focus again.
@@ -31,12 +31,12 @@ A native macOS menu bar Pomodoro timer built around your task list: pick a task,
 ## Controls
 
 Slim row:
-- Task title: tap to open or close the task list. Shows "Select a task" when nothing is selected, and "Short Break" / "Long Break" during breaks.
+- Task title: tap to hide or show the task list (it is shown every time you open the popover). Shows "Select a task" when nothing is selected, and "Short Break" / "Long Break" during breaks.
 - Round button: start / pause.
 
 Task list:
 - Tap a task or subtask to select it. If a focus session is running, the time so far is logged to the previous task and the countdown keeps going for the new one.
-- "Add task…": type and press Return.
+- "Add task…": type and press Return. The new task is selected for you, unless a focus session is already running.
 - Hover a task for `+` (add a subtask) and `×` (remove). Removing a task also removes its subtasks.
 - Time on a subtask is logged as "Task › Subtask".
 

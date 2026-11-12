@@ -9,7 +9,8 @@ struct MenuBarView: View {
     var openAnalytics: () -> Void = {}
 
     @Environment(\.colorScheme) var scheme
-    @State private var expanded = false
+    /// The task list is open by default, and re-opens every time the popover is shown.
+    @State private var expanded = true
     @State private var hoveredID: UUID?
     @State private var newTask = ""
     @State private var addingSubtaskTo: UUID?
@@ -37,6 +38,12 @@ struct MenuBarView: View {
         .frame(width: width)
         .background(t.background)
         .transaction { $0.animation = nil }
+        .onReceive(NotificationCenter.default.publisher(for: NSPopover.willShowNotification)) { _ in
+            expanded = true
+            hoveredID = nil
+            // Nothing to pick yet: put the cursor straight into "Add task…".
+            if tasks.tasks.isEmpty { focus = .newTask }
+        }
     }
 
     private var divider: some View {
@@ -131,7 +138,11 @@ struct MenuBarView: View {
                 }
             }
             inputRow(placeholder: "Add task…", text: $newTask, field: .newTask, indent: 20) {
-                tasks.addTask(newTask)
+                if let id = tasks.addTask(newTask), !focusInProgress {
+                    // Add → start: a new task becomes the selection unless it would
+                    // interrupt a focus session that is already under way.
+                    select(id)
+                }
                 newTask = ""
                 focus = .newTask
             } onCancel: {
@@ -180,7 +191,7 @@ struct MenuBarView: View {
         )
         .padding(.horizontal, 6)
         .contentShape(Rectangle())
-        .onTapGesture { pick(item.id) }
+        .onTapGesture { select(item.id) }
         .onHover { inside in
             if inside { hoveredID = item.id } else if hoveredID == item.id { hoveredID = nil }
         }
@@ -261,12 +272,15 @@ struct MenuBarView: View {
 
     // MARK: - Actions
 
-    private func pick(_ id: UUID) {
-        if tasks.selectedID != id {
-            tasks.select(id: id)
-            model.selectTask(name: tasks.selectedName)
-        }
-        expanded = false
+    private var focusInProgress: Bool {
+        model.phase == .work && model.inSession
+    }
+
+    /// Tapping a row selects it; the list stays open so the next tap can be the play button.
+    private func select(_ id: UUID) {
+        guard tasks.selectedID != id else { return }
+        tasks.select(id: id)
+        model.selectTask(name: tasks.selectedName)
     }
 
     private func remove(_ id: UUID) {
